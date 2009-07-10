@@ -1,0 +1,49 @@
+### named stage backup
+
+0. Rationale
+1. How do I use it and what for?
+2. License and contact
+
+
+### 0. Rationale
+There are lots of backup systems out there, and really, there is no reason for you to see any point in making yet another one.
+I cannot say I have tested them all, and I cannot be sure that really none of them does what I want. I simply thought that learning them all just to find out if they do, is a lot of trouble and I can write it myself faster. And then I decided to share it.
+
+So, what is it I wanted to have?
+I wanted a simple tool which would let me back my work up when it reaches a somehow important stage. Any kind of work, and just at that stage. It would be probably best to see an example. There are some in 1. below.
+
+
+
+### 1. How do I use it and what for?
+WARNING: this is an ALPHA version. Do NOT use it as your only backup solution!
+
+You can see some more information by issuing "nsb help". Here are just examples.
+
+Example 1:
+You are playing with your xorg.conf.
+Before you start, you want to have a backup of the working version:
+	nsb pa xorg						# create a new project called "xorg"
+	nsb fa xorg /etc/X11/xorg.conf	# add xorg.conf to the project
+	nsb pbs xorg working			# backup project "xorg" as "working"
+After a lot of fiddling, you have no idea where you actually are now. So you decide to get back to what worked and stop losing your time:
+	nsb pr xorg	working				# restore the working version
+	nsp pd xorg
+
+Example 2:
+You cannot decide if you prefer XMonad or Awesome. You keep commenting and uncommenting bits of your .xinitrc. This can be done easier:
+	nsb pa xinit					# create a new project called "xinit"
+	nsb fa xinit ~/.xinitrc			# add .xinitrc to the project
+	nsb pbs xinit xmonad			# backup the XMonad version
+Now modify your .xinitrc to the Awesome version and
+	nsb pbs xinit awesome			# backup the Awesome version
+Now whenever you want to switch to XMonad or Awesome, just issue
+	nsb prs xinit xmonad
+	or
+	nsb prs xinit awesome			# restore the appropriate version
+
+
+
+### 2. License and contact
+nbs is GPL v3+.
+And remember, it is an ALPHA! It gives absolutely no warranty whatsoever to save your data. It might just as well destroy them, format your drive and burn the disk. You have been warned.
+You can contact me at kamil{-dot-}stachowski{-at-sign-}gmail{-dot-}com. I will be very happy to receive any kind of feedback.
