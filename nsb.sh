@@ -1,0 +1,278 @@
+#!/bin/bash
+
+
+# WARNING: ALPHA version
+# Do NOT use as your only backup solution!
+
+
+# TODO:	sth's wrong about hidden files
+
+
+current="ZZZZcurrent"
+dirBackup="/home/kamil/.nsb"	# full path! (no ~ &c.)
+verbose=2						# 0 = quiet, 1 = normal, 2 = chatterbox
+
+#=======================================================================================
+
+function assert () {
+	case "$1" in
+		fileInProj)
+			if ! [ -f "$dirBackup/$2/$3$4" ]; then
+				msg "warn" "File \"$4\" not in project \"$2\"."
+				return 1
+			fi;;
+		fileInProjN)
+			if [ -f "$dirBackup/$2/$3$4" ]; then
+				msg "warn" "File \"$4\" already in project \"$2\"."
+				return 1
+			fi;;
+		fileExists)
+			if ! [ -a "$2" ]; then
+				msg "warn" "File \"$2\" does not exist."
+				return 1
+			fi;;
+		projEmptyN)
+			if [ `ls "$dirBackup/$2" | wc -l` -eq 0 ]; then
+				msg "warn" "Project \"$2\" is empty."
+				return 1
+			fi;;
+		projExists)
+			if ! [ -d "$dirBackup/$2" ]; then
+				msg "warn" "Project \"$2\" does not exist."
+				return 1
+			fi;;
+		projExistsCrit)
+			if ! [ -d "$dirBackup/$2" ]; then
+				msg "err" "Project \"$2\" does not exist."
+				exit 1
+			fi;;
+		projExistsN)
+			if [ -d "$dirBackup/$2" ]; then
+				msg "warn" "Project \"$2\" already exists."
+				return 1
+			fi;;
+		stageExistsCrit)
+			if ! [ -d "$dirBackup/$2/$3" ]; then
+				msg "err" "Stage \"$3\" does not exist for project \"$2\"."
+				exit 1
+			fi;;
+		stageExistsN)
+			if [ -d "$dirBackup/$2/$3" ]; then
+				msg "warn" "Stage \"$3\" already exists for project \"$2\"."
+				return 1
+			fi;;
+		*)
+			echo "that's weird"
+	esac
+}
+
+#---------------------------------------------------------------------------------------
+
+function msg {
+	if [ $verbose -eq 0 ]; then break; fi
+	case "$1" in
+		"err")		echo -e "[ \033[0;31merr\033[0m  ] $2";;
+		"focus")	echo -e "\033[0;34m$2\033[0m";;
+		"norm")		echo "$2";;
+		"ok")		echo -e "[  \033[0;32mok\033[0m  ] $2";;
+		"warn")		echo -e "[ \033[0;33mwarn\033[0m ] $2";;
+		*)			echo "that's weird 2";;
+	esac
+}
+
+#=======================================================================================
+
+function fileAdd {
+	project="$1"; stage="$2"; file=`readlink -f "$3"`
+	if [ -d "$file" ]; then
+		for i in $file/*; do fileAdd "$project" "$stage" "$i"; done
+	else
+		if assert fileExists "$file" && assert fileInProjN "$project" "$stage" "$file"; then
+			mkdir --parents "$dirBackup/$project/$stage`dirname $file`" && \
+			cp --dereference --update "$file" "$dirBackup/$project/$stage$file" && \
+			if [ $verbose -eq 2 ]; then msg "norm" "File \"$file\" added to project \"$project\" at stage \"$stage\"."; fi
+		fi
+	fi
+}
+
+#---------------------------------------------------------------------------------------
+
+function fileDel {
+	project=$1; stage=$2; file=`readlink -f "$3"`
+	if [ -d "$file" ]; then
+		for i in $file/*; do fileDel "$project" "$stage" "$i"; done
+	else
+		if assert fileInProj "$project" "$stage" "$file"; then
+			rm "$dirBackup/$project/$stage$file" && \
+			if [ $verbose -eq 2 ]; then msg "norm" "File \"$file\" removed from project \"$project\"."; fi
+		fi
+	fi
+}
+
+#---------------------------------------------------------------------------------------
+
+function fileRestore {
+	project="$1"; stage="$2"; file=`readlink -f "$3"`;
+	if assert fileInProj "$project" "$stage" "$file"; then
+		cp --dereference "$dirBackup/$project/$stage$file" "$file" && \
+		if [ $verbose -eq 2 ]; then msg "norm" "File \"$file\" restored from project \"$project\", stage \"$stage\"."; fi
+	fi
+}
+
+#=======================================================================================
+
+function projectAdd {
+	shift
+	for i in "$@"; do
+		if assert projExistsN "$i"; then
+			mkdir -p "$dirBackup/$i/$current" && msg "ok" "Project \"$i\" added."
+		fi
+	done
+}
+
+#---------------------------------------------------------------------------------------
+
+function projectBackup {
+	stage="$1";
+	shift 2
+	for i in "$@"; do
+		if assert projExists "$i" && assert projEmptyN "$i"; then
+			for ii in `find "$dirBackup/$i/$current" -type f`; do
+				fileAdd "$i" "$stage" "${ii#"$dirBackup/$i/$current"}"
+			done && msg "ok" "Project \"$i\" backed up."
+		fi
+	done
+}
+
+#---------------------------------------------------------------------------------------
+
+function projectBackupStage {
+	project="$2"; stage="$3"
+	assert projExistsCrit "$project"
+	shift
+	if ! assert stageExistsN "$project" "$stage"; then
+		read -n 1 -p "Are you sure you want to overwrite it? [y|N] "
+		if [ "$REPLY" != "y" ]; then exit; else echo; fi
+	fi
+	projectBackup "$stage" "dummy" "$project"
+}
+
+#---------------------------------------------------------------------------------------
+
+function projectDel {
+	shift
+	for i in "$@"; do
+		if assert projExists "$i"; then
+			read -n 1 -p "Are you sure you want to remove project \"$i\"? [y|N] "
+			if [ "$REPLY" == "y" ]; then
+				echo
+				rm -rf "$dirBackup/$i" && msg "ok" "Project \"$i\" removed."
+			fi
+		fi	
+	done
+}
+
+#---------------------------------------------------------------------------------------
+
+function projectFile {
+	action="$1"; stage="$2"; project="$4"
+	assert projExistsCrit "$project"
+	if [ "$3" == "frs" ]; then shift 5; else shift 4; fi
+	for i in "$@"; do
+		case "$action" in
+			add)
+				fileAdd "$project" "$current" "$i";;
+			del)
+				fileDel "$project" "$current" "$i"
+				find "$dirBackup/$project/$current" -type d -empty -delete;;
+			rest)
+				fileRestore "$project" "$stage" "$i";;
+			*)
+				echo "that's weird 3"
+		esac
+	done
+}
+
+#---------------------------------------------------------------------------------------
+
+function projectList {
+	shift
+	for i in "$@"; do
+		if assert projExists "$i"; then
+			for ii in $dirBackup/$i/*; do
+				echo
+				msg "focus" "Project \"$i\", stage \"${ii#"$dirBackup/$i"}\":"
+				tmp=`find "$ii" -type f | xargs ls -gho | awk '{print $4", "$5" "$6}'`
+				echo -e "${tmp//"$ii"/}"
+			done
+		fi
+	done
+}
+
+#---------------------------------------------------------------------------------------
+
+function projectRestore {
+	shift
+	for i in "$@"; do
+		if assert projExists "$i" && assert projEmptyN "$i"; then
+			for ii in `find "$dirBackup/$i/$current" -type f`; do
+				fileRestore "$i" "$current" "${ii#"$dirBackup/$i/$current"}"
+			done && msg "ok" "Project \"$i\" restored."
+		fi
+	done
+}
+
+#---------------------------------------------------------------------------------------
+
+function projectRestoreStage {
+	project="$2"; stage="$3";
+	shift
+	if assert projExistsCrit "$project" && assert stageExistsCrit "$project" "$stage" && projEmptyN "$project"; then
+		for ii in `find "$dirBackup/$project/$stage" -type f`; do
+			fileRestore "$project" "$stage" "${ii#"$dirBackup/$project/$stage"}"
+		done && msg "ok" "Project \"$project\" restored from stage \"$stage\"."
+	fi
+}
+
+#======================================================================================
+
+function usage {
+	echo -e "nsb COMMAND [PROJECT(S) | PROJECT STAGE] [FILE(S)]"
+	echo
+	echo -e "File commands:"
+	echo -e "fa PROJECT FILE(S)\tadd FILE(S) to PROJECT"
+	echo -e "fd PROJECT FILE(S)\tdelete FILE(S) from PROJECT"
+	echo -e "fr PROJECT FILE(S)\trestore FILE(S) from PROJECT"
+	echo -e "frs PROJECT STAGE FILE\trestore FILE from PROJECT at STAGE"
+	echo
+	echo "Project commands:"
+	echo -e "pa PROJECT(S)\t\tadd PROJECT(S)"
+	echo -e "pb PROJECT(S)\t\tback up PROJECT(S)"
+	echo -e "pbs PROJECT STAGE\tback up PROJECT as STAGE"
+	echo -e "pd PROJECT(S)\t\tdelete PROJECT(S)"
+	echo -e "pl PROJECT(S)\t\tlist contents of PROJECT(S)"
+	echo -e "pr PROJECT(S)\t\trestore PROJECT(S)"
+	echo -e "prs PROJECT STAGE\trestore PROJECT from STAGE"
+	echo
+	echo -e "\033[0;31mWARNING:\033[0m This script is an \033[0;31malpha\033[0m version."
+	echo -e "Do \033[0;31mNOT\033[0m use it as your only backup solution!"
+	echo
+	exit 0
+}
+
+#======================================================================================
+
+case "$1" in
+	fa)		projectFile "add" "$current" "$@";;
+	fd)		projectFile "del" "$current" "$@";;
+	fr)		projectFile "rest" "$current" "$@";;
+	frs)	projectFile "rest" "$3" "$@";;
+	pa)		projectAdd "$@";;
+	pb)		projectBackup "$current" "$@";;
+	pbs)	projectBackupStage "$@";;
+	pd)		projectDel "$@";;
+	pl)		projectList "$@";;
+	pr)		projectRestore "$@";;
+	prs)	projectRestoreStage "$@";;
+	*)		usage;;
+esac
