@@ -1,0 +1,5 @@
+#!/bin/bash
+
+current="ZZZZcurrent"
+dirBackup="/home/`whoami`/.nsb"
+verbose=2

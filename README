@@ -27,7 +27,7 @@ Before you start, you want to have a backup of the working version:
 	nsb pbs xorg working			# backup project "xorg" as "working"
 After a lot of fiddling, you have no idea where you actually are now. So you decide to get back to what worked and stop losing your time:
 	nsb pr xorg	working				# restore the working version
-	nsp pd xorg
+	nsp pd xorg						# delete the project
 
 Example 2:
 You cannot decide if you prefer XMonad or Awesome. You keep commenting and uncommenting bits of your .xinitrc. This can be done easier:

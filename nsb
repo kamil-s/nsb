@@ -7,11 +7,6 @@
 
 # TODO:	sth's wrong about hidden files
 
-
-current="ZZZZcurrent"
-dirBackup="/home/kamil/.nsb"	# full path! (no ~ &c.)
-verbose=2						# 0 = quiet, 1 = normal, 2 = chatterbox
-
 #=======================================================================================
 
 function assert () {
@@ -30,6 +25,11 @@ function assert () {
 			if ! [ -a "$2" ]; then
 				msg "warn" "File \"$2\" does not exist."
 				return 1
+			fi;;
+		projEmptyNCrit)
+			if ! [ `ls "$dirBackup/$2" | wc -l` -eq 0 ]; then
+				msg "err" "Project \"$2\" is empty."
+				exit 1
 			fi;;
 		projEmptyN)
 			if [ `ls "$dirBackup/$2" | wc -l` -eq 0 ]; then
@@ -121,6 +121,13 @@ function fileRestore {
 
 #=======================================================================================
 
+function listProjects {
+	msg "focus" "projects:"
+	ls -1 "$dirBackup"
+}
+
+#=======================================================================================
+
 function projectAdd {
 	shift
 	for i in "$@"; do
@@ -139,7 +146,7 @@ function projectBackup {
 		if assert projExists "$i" && assert projEmptyN "$i"; then
 			for ii in `find "$dirBackup/$i/$current" -type f`; do
 				fileAdd "$i" "$stage" "${ii#"$dirBackup/$i/$current"}"
-			done && msg "ok" "Project \"$i\" backed up."
+			done && msg "ok" "Project \"$i\" backed up at stage \"$stage\"."
 		fi
 	done
 }
@@ -149,6 +156,7 @@ function projectBackup {
 function projectBackupStage {
 	project="$2"; stage="$3"
 	assert projExistsCrit "$project"
+	assert projEmptyNCrit "$project"
 	shift
 	if ! assert stageExistsN "$project" "$stage"; then
 		read -n 1 -p "Are you sure you want to overwrite it? [y|N] "
@@ -245,14 +253,17 @@ function usage {
 	echo -e "fr PROJECT FILE(S)\trestore FILE(S) from PROJECT"
 	echo -e "frs PROJECT STAGE FILE\trestore FILE from PROJECT at STAGE"
 	echo
-	echo "Project commands:"
+	echo -e "Project commands:"
 	echo -e "pa PROJECT(S)\t\tadd PROJECT(S)"
 	echo -e "pb PROJECT(S)\t\tback up PROJECT(S)"
-	echo -e "pbs PROJECT STAGE\tback up PROJECT as STAGE"
+	echo -e "pbs PROJECT STAGE\tback up PROJECT at STAGE"
 	echo -e "pd PROJECT(S)\t\tdelete PROJECT(S)"
 	echo -e "pl PROJECT(S)\t\tlist contents of PROJECT(S)"
 	echo -e "pr PROJECT(S)\t\trestore PROJECT(S)"
 	echo -e "prs PROJECT STAGE\trestore PROJECT from STAGE"
+	echo
+	echo -e "Other:"
+	echo -e "l\t\t\tlist all projects"
 	echo
 	echo -e "\033[0;31mWARNING:\033[0m This script is an \033[0;31malpha\033[0m version."
 	echo -e "Do \033[0;31mNOT\033[0m use it as your only backup solution!"
@@ -262,11 +273,21 @@ function usage {
 
 #======================================================================================
 
+current="ZZZZcurrent"
+dirBackup="/home/`whoami`/.nsb"
+verbose=2
+if [ -f "/home/`whoami`/.nsb.conf" ]; then
+	source "/home/`whoami`/.nsb.conf"
+else
+	msg "warn" "Config file missing.\n         Please copy \"/etc/nsb.conf.sample\" to \"~/.nsb.conf\" and modify appropriately."
+fi
+
 case "$1" in
 	fa)		projectFile "add" "$current" "$@";;
 	fd)		projectFile "del" "$current" "$@";;
 	fr)		projectFile "rest" "$current" "$@";;
 	frs)	projectFile "rest" "$3" "$@";;
+	l)		listProjects;;
 	pa)		projectAdd "$@";;
 	pb)		projectBackup "$current" "$@";;
 	pbs)	projectBackupStage "$@";;
