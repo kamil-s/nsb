@@ -26,15 +26,15 @@ function assert () {
 				msg "warn" "File \"$2\" does not exist."
 				return 1
 			fi;;
-		projEmptyNCrit)
-			if ! [ `ls "$dirBackup/$2" | wc -l` -eq 0 ]; then
-				msg "err" "Project \"$2\" is empty."
-				exit 1
-			fi;;
 		projEmptyN)
-			if [ `ls "$dirBackup/$2" | wc -l` -eq 0 ]; then
+			if [ `find "$dirBackup/$2" -type f | wc -l` -eq 0 ]; then
 				msg "warn" "Project \"$2\" is empty."
 				return 1
+			fi;;
+		projEmptyNCrit)
+			if [ `find "$dirBackup/$2" -type f | wc -l` -eq 0 ]; then
+				msg "err" "Project \"$2\" is empty."
+				exit 1
 			fi;;
 		projExists)
 			if ! [ -d "$dirBackup/$2" ]; then
